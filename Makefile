@@ -1,4 +1,5 @@
 DATA_DIR = data
+CPT_DATA_DIR = data/synthetic-cpt-data
 
 $(shell mkdir -p figures intermediates logs)
 $(shell mkdir -p intermediates/fits \
@@ -19,8 +20,8 @@ DATASET_NAMES_3D = $(DATASET_NAMES_A_FIELD) $(DATASET_NAMES_B_FIELD)
 DATASET_NAMES =  $(DATASET_NAMES_3D) A2-T B2-T
 MODELS = GeoWarp GW-Vert-CV GW-CV Linear
 
-DATA_A_FIELD = $(addprefix data/cpt-data/, $(addsuffix .csv, $(DATASET_NAMES_A_FIELD)))
-DATA_B_FIELD = $(addprefix data/cpt-data/, $(addsuffix .csv, $(DATASET_NAMES_B_FIELD)))
+DATA_A_FIELD = $(addprefix $(CPT_DATA_DIR)/, $(addsuffix .csv, $(DATASET_NAMES_A_FIELD)))
+DATA_B_FIELD = $(addprefix $(CPT_DATA_DIR)/, $(addsuffix .csv, $(DATASET_NAMES_B_FIELD)))
 
 FITS = $(addprefix intermediates/fits/GeoWarp_, $(addsuffix .qs, $(DATASET_NAMES)))
 FITS_3D = $(addprefix intermediates/fits/GeoWarp_, $(addsuffix .qs, $(DATASET_NAMES_3D)))
@@ -105,7 +106,7 @@ figures/simulation-unconditional-3d-png/%.png: figures/simulation-unconditional-
 figures/site-summary/%.pdf: \
 	scripts/site-summary.R
 	Rscript $< \
-		--input data/cpt-data/$*.csv \
+		--input $(CPT_DATA_DIR)/$*.csv \
 		--output $@
 
 figures/parent-example.pdf: \
@@ -254,27 +255,27 @@ figures/cv-predictions/%.pdf: \
 figures/summary-A2.pdf: \
 	scripts/summary-A2.R
 	Rscript $< \
-		--input data/cpt-data/A2.csv \
+		--input $(CPT_DATA_DIR)/A2.csv \
 		--output $@
 
 figures/dataset-cpts-A.pdf: \
 	scripts/dataset-cpts.R \
 	$(DATA_A_FIELD) \
-	data/cpt-data/A2-T.csv
+	$(CPT_DATA_DIR)/A2-T.csv
 	Rscript $< \
   		--datasets \
   			$(DATA_A_FIELD) \
-  			data/cpt-data/A2-T.csv \
+  			$(CPT_DATA_DIR)/A2-T.csv \
   		--output $@
 
 figures/dataset-cpts-B.pdf: \
 	scripts/dataset-cpts.R \
 	$(DATA_B_FIELD) \
-	data/cpt-data/B2-T.csv
+	$(CPT_DATA_DIR)/B2-T.csv
 	Rscript $< \
   		--datasets \
   			$(DATA_B_FIELD) \
-  			data/cpt-data/B2-T.csv \
+  			$(CPT_DATA_DIR)/B2-T.csv \
   		--output $@
 
 figures/map-cpts-A.pdf: \
@@ -325,7 +326,7 @@ intermediates/cv-metrics-all.qs: \
 intermediates/binned-statistics-metrics.qs: \
 	scripts/binned-statistics-metrics.R
 	Rscript $< \
-		--data-directory data/cpt-data \
+		--data-directory $(CPT_DATA_DIR) \
 		--output $@
 
 
@@ -369,7 +370,7 @@ intermediates/cv-predictions/%.qs: \
 	intermediates/cv-fits/%.qs
 	$(eval DATASET_NAME := $(word 2,$(subst _, ,$*)))
 	Rscript $< \
-		--input data/cpt-data/$(DATASET_NAME).csv \
+		--input $(CPT_DATA_DIR)/$(DATASET_NAME).csv \
 		--fits intermediates/cv-fits/$*.qs \
 		--output $@
 
@@ -380,16 +381,16 @@ intermediates/cv-fits/%.qs: \
 	$(eval MODEL_NAME := $(word 1,$(subst _, ,$*)))
 	$(eval DATASET_NAME := $(word 2,$(subst _, ,$*)))
 	Rscript $< \
-		--input data/cpt-data/$(DATASET_NAME).csv \
+		--input $(CPT_DATA_DIR)/$(DATASET_NAME).csv \
 		--model $(MODEL_NAME) \
 		--log-file-pattern logs/cv-fits/$*_{group}.txt \
 		--output $@
 
 intermediates/fits/GeoWarp_%.qs: \
 	scripts/fit.R \
-	data/cpt-data/%.csv
+	$(CPT_DATA_DIR)/%.csv
 	Rscript $< \
-		--input data/cpt-data/$*.csv \
+		--input $(CPT_DATA_DIR)/$*.csv \
 		--model GeoWarp \
 		--log-file logs/fits/GeoWarp_$*.txt \
 		--output $@
