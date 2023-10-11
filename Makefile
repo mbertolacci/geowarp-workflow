@@ -1,4 +1,3 @@
-DATA_DIR = data
 CPT_DATA_DIR = data/synthetic-cpt-data
 
 $(shell mkdir -p figures intermediates logs)
