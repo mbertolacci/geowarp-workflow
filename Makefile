@@ -339,21 +339,21 @@ intermediates/cv-fit-metrics.qs: \
 
 intermediates/simulated-slices-3d/GeoWarp_%.qs: \
 	scripts/simulated-slices-3d.R \
-	intermediates/fits/GeoWarp_GeoWarp_%.qs
+	intermediates/fits/GeoWarp_%.qs
 	Rscript $< \
   		--fit intermediates/fits/GeoWarp_$*.qs \
   		--output $@
 
 intermediates/predicted-slices-3d/GeoWarp_%.qs: \
 	scripts/predicted-slices-3d.R \
-	intermediates/fits/GeoWarp_GeoWarp_%.qs
+	intermediates/fits/GeoWarp_%.qs
 	Rscript $< \
   		--fit intermediates/fits/GeoWarp_$*.qs \
   		--output $@
 
 intermediates/predicted-single-3d/GeoWarp_%.qs: \
 	scripts/predicted-single-3d.R \
-	intermediates/fits/GeoWarp_GeoWarp_%.qs
+	intermediates/fits/GeoWarp_%.qs
 	Rscript $< \
   		--fit intermediates/fits/GeoWarp_$*.qs \
   		--output $@
