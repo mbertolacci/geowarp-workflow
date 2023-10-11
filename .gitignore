@@ -1,0 +1,8 @@
+data/cpt-data/
+figures/
+figures_old/
+figures_prev/
+intermediates/
+logs/
+scratch/
+.Rhistory
