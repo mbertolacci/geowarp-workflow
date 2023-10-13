@@ -1,7 +1,6 @@
 data/cpt-data/
 figures/
-figures_old/
-figures_prev/
+figures_*/
 intermediates/
 logs/
 scratch/

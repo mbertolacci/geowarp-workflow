@@ -48,11 +48,7 @@ CV_PREDICTION_PLOTS = $(foreach dataset,$(DATASET_NAMES),$(foreach model,$(MODEL
 
 SITE_SUMMARIES_3D = $(addprefix figures/site-summary/, $(addsuffix .pdf, $(DATASET_NAMES_3D)))
 
-all: all_except_cv \
-	figures/cv-metrics-plot.pdf \
-	figures/cv-metrics-table.tex \
-	figures/cv-metrics-table-full.tex \
-	$(CV_PREDICTION_PLOTS)
+all: all_except_cv cv
 
 all_except_cv: figures/dataset-cpts-A.pdf \
 	figures/dataset-cpts-B.pdf \
@@ -74,6 +70,11 @@ all_except_cv: figures/dataset-cpts-A.pdf \
 	figures/isodistance-vertical.pdf \
 	figures/parent-example.pdf \
 	figures/nu-selection-summary.txt
+
+cv: figures/cv-metrics-plot.pdf \
+	figures/cv-metrics-table.tex \
+	figures/cv-metrics-table-full.tex \
+	$(CV_PREDICTION_PLOTS)
 
 # NOTE(mgnb): Prevents these files, which are governed by pattern rules, from
 # being deleted if make fails
