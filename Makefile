@@ -143,7 +143,7 @@ figures/simulation-conditional-3d-pdf/GeoWarp_%.pdf: \
   	intermediates/predicted-slices-3d/GeoWarp_%.qs
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
-		--simulated-slices intermediates/predicted-slices-3d/$*.qs \
+		--simulated-slices intermediates/predicted-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/simulation-conditional-single-3d/GeoWarp_%.pdf: \
@@ -152,14 +152,14 @@ figures/simulation-conditional-single-3d/GeoWarp_%.pdf: \
   	intermediates/predicted-slices-3d/GeoWarp_%.qs
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
-		--simulated-slices intermediates/predicted-slices-3d/$*.qs \
+		--simulated-slices intermediates/predicted-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/simulation-unconditional-3d-pdf/GeoWarp_%.pdf: \
 	scripts/simulation-unconditional-plot-3d.R \
   	intermediates/simulated-slices-3d/GeoWarp_%.qs
 	Rscript $< \
-		--simulated-slices intermediates/simulated-slices-3d/$*.qs \
+		--simulated-slices intermediates/simulated-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/simulation-unconditional-single-3d/GeoWarp_%.pdf: \
@@ -168,7 +168,7 @@ figures/simulation-unconditional-single-3d/GeoWarp_%.pdf: \
   	intermediates/simulated-slices-3d/GeoWarp_%.qs
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
-		--simulated-slices intermediates/simulated-slices-3d/$*.qs \
+		--simulated-slices intermediates/simulated-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/prediction-2d-pdf/GeoWarp_%.pdf: \
@@ -187,7 +187,7 @@ figures/prediction-3d-pdf/GeoWarp_%-mean.pdf: \
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
 		--variable log_q_c_mean \
-		--predicted-slices intermediates/predicted-slices-3d/$*.qs \
+		--predicted-slices intermediates/predicted-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/prediction-3d-pdf/GeoWarp_%-sd.pdf: \
@@ -197,7 +197,7 @@ figures/prediction-3d-pdf/GeoWarp_%-sd.pdf: \
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
 		--variable log_q_c_sd \
-		--predicted-slices intermediates/predicted-slices-3d/$*.qs \
+		--predicted-slices intermediates/predicted-slices-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/prediction-single-3d/GeoWarp_%.pdf: \
@@ -206,7 +206,7 @@ figures/prediction-single-3d/GeoWarp_%.pdf: \
   	intermediates/predicted-single-3d/GeoWarp_%.qs
 	Rscript $< \
 		--fit intermediates/fits/GeoWarp_$*.qs \
-		--predicted-single intermediates/predicted-single-3d/$*.qs \
+		--predicted-single intermediates/predicted-single-3d/GeoWarp_$*.qs \
 		--output $@
 
 figures/vertical-profile.pdf: \
