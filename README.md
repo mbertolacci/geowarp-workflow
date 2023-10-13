@@ -30,9 +30,9 @@ The full workflow can be run from the command line using `make`.
 GEOWARP_GROUP_CORES=4 GEOWARP_THREADS=2 make -j4 all
 ```
 
-This will run the entire workflow, including model fitting, cross validation, and plotting. Figures will go into the `figures` directory. The variables `GEOWARP_GROUP_CORES` and `GEOWARP_THREADS` control the number of cores used in different parts of the code, while the `-j` flag to `make` controls the number of parallel processes used by make. The maximum number of threads used will be the product of these variables, so they should be tailored to the number of cores on your machine.
+This will run the entire workflow, including model fitting, cross validation, and plotting. Figures will go into the `figures` directory. The variables `GEOWARP_GROUP_CORES` and `GEOWARP_THREADS` control the number of cores used in different parts of the code, while the `-j` flag to `make` controls the number of parallel processes used by make. The maximum number of cores and threads used will be the product of these variables, so they should be tailored to the number of cores on your machine.
 
-In practice, different steps of the workflow benefit from different values for these variables. In particular, the cross validation code benefits from using fewer threads. You may therefore wish to run the steps that exclude cross-validation like so:
+Different steps of the workflow benefit from different values for these variables. In particular, the cross-validation code, which must run many fits to data, benefits from using fewer threads but more cores. You may therefore wish to run the steps that exclude cross-validation like so:
 
 ```bash
 GEOWARP_THREADS=8 make -j4 all_except_cv
