@@ -1,6 +1,6 @@
 # GeoWarp: Warped spatial processes for inferring subsea sediment properties
 
-The code applies the GeoWarp modelling framework to CPT data. The data included in this repository is synthetic, built to match the properties of the real data in the paper, except for the mean profile which has been changed to another realistic value.
+The code applies the GeoWarp modelling framework to CPT data. The data included in this repository is synthetic, simulated from the model fitted to the real data.
 
 ## Installation
 

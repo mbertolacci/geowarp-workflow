@@ -255,7 +255,8 @@ figures/cv-predictions/%.pdf: \
 		--output $@
 
 figures/summary-A2.pdf: \
-	scripts/summary-A2.R
+	scripts/summary-A2.R \
+	$(CPT_DATA_DIR)/A2.csv
 	Rscript $< \
 		--input $(CPT_DATA_DIR)/A2.csv \
 		--output $@
