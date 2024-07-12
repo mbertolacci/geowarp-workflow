@@ -15,7 +15,6 @@ dummy_df <- data.frame(
   horizontal = rep(seq(0, 150, length.out = 5), each = 40),
   depth = rep(seq(0, 41, length.out = 40), 5)
 )
-
 ordering <- sample.int(nrow(dummy_df))
 x_observed <- cbind(dummy_df$horizontal, dummy_df$depth)[ordering, ]
 

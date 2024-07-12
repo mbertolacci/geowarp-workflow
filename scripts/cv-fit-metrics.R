@@ -1,144 +1,99 @@
 source('scripts/partials/base.R')
 
 library(argparse)
-library(scoringRules)
-library(Matrix)
 library(dplyr, warn.conflicts = FALSE)
+library(boot)
 library(parallel)
 
-options(mc.cores = as.integer(Sys.getenv('GEOWARP_THREADS')))
+if (Sys.getenv('GEOWARP_THREADS') != '') {
+  options('mc.cores' = as.integer(Sys.getenv('GEOWARP_THREADS')))
+}
 
 parser <- ArgumentParser()
-parser$add_argument('--cv-predictions', nargs = '+')
+parser$add_argument('--cv-scores', nargs = '+')
+parser$add_argument('--method')
 parser$add_argument('--output')
 args <- parser$parse_args()
 
-log_debug('Loading CV predictions')
-cv_predictions <- mclapply(
-  args$cv_predictions,
-  function(filename) {
-    model_name <- strsplit(basename(filename), '_')[[1]][1]
-    dataset_name <- strsplit(basename(filename), '_')[[1]][2] %>%
-      gsub('.qs', '', .)
+stopifnot(args$method %in% c('t_test', 'blocked_bootstrap'))
 
-    if (!file.exists(filename)) return(NULL)
+log_debug('Loading CV scores')
+cv_scores_base <- lapply(args$cv_scores, qs::qread) %>%
+  bind_rows()
 
-    output <- qs::qread(filename)
-    for (i in seq_along(output)) {
-      output[[i]]$model <- model_name
-      output[[i]]$dataset <- dataset_name
-      output[[i]]$predicted_df$model <- model_name
-      output[[i]]$predicted_df$dataset <- dataset_name
-    }
-    output
-  }
-)
+cv_scores_all <- cv_scores_base %>%
+  filter(dataset %in% datasets_for_all) %>%
+  mutate(dataset = 'All')
 
-log_trace('Flattening CV predictions')
-cv_prediction_flat <- do.call(c, lapply(cv_predictions, function(cv_prediction_i) {
-  lapply(cv_prediction_i, getElement, 'predicted_df')
-})) %>%
-  mclapply(function(df) {
-    df %>%
-      mutate(
-        log_q_c_star_q025 = matrixStats::rowQuantiles(log_q_c_star_samples, probs = 0.025),
-        log_q_c_star_q975 = matrixStats::rowQuantiles(log_q_c_star_samples, probs = 0.975),
-        log_q_c_star_sd = matrixStats::rowSds(log_q_c_star_samples)
-      )
-  })
+cv_scores <- bind_rows(cv_scores_base, cv_scores_all)
 
-mse_score <- function(observed, posterior_mean, posterior_sd, ...) {
-  (observed - posterior_mean) ^ 2
-}
-
-crps_score <- function(observed, posterior_mean, posterior_sd, ...) {
-  crps_norm(observed, posterior_mean, posterior_sd)
-}
-
-logs_score <- function(observed, posterior_mean, posterior_sd, ...) {
-  logs_norm(observed, posterior_mean, posterior_sd)
-}
-
-interval_score <- function(observed, lower, upper, alpha) {
-  upper - lower + (2 / alpha) * (
-    (lower - observed) * (observed < lower)
-    + (observed - upper) * (observed > upper)
-  )
-}
-
-interval005_score <- function(observed, posterior_q025, posterior_q975, ...) {
-  interval_score(observed, posterior_q025, posterior_q975, alpha = 0.05)
-}
-
-coverage95_score <- function(observed, posterior_q025, posterior_q975, ...) {
-  1 * ((observed < posterior_q975) & (observed > posterior_q025))
-}
-
-dss_score <- function(observed, posterior_samples, ...) {
-  dss_sample(observed, posterior_samples)
-}
-
-dss_p_score <- function(observed, posterior_samples, p) {
-  sapply(seq_len(floor(length(observed) / p)), function(i) {
-    indices <- p * (i - 1) + seq_len(p)
-    samples <- posterior_samples[indices, ]
-    mu <- rowMeans(samples)
-    Sigma <- cov(t(samples))
-    chol_Sigma <- chol(Sigma)
-    (
-      sum(log(diag(chol_Sigma)))
-      + 0.5 * sum(
-        backsolve(chol_Sigma, observed[indices] - mu, transpose = TRUE) ^ 2
-      )
+output <- cv_scores %>%
+  group_by(metric, dataset) %>%
+  group_modify(~ {
+    log_debug('Calculating best model for {.y$metric} and {.y$dataset}')
+    models <- .x %>%
+      group_by(model) %>%
+      group_map(~ .y$model) %>%
+      unlist()
+    names <- (
+      .x %>%
+        group_by(model) %>%
+        group_map(~ .x$name)
+    )[[1]]
+    score_matrix <- do.call(
+      cbind,
+      .x %>%
+        group_by(model) %>%
+        group_map(~ .x$value)
     )
-  })
-}
+    score_average <- colMeans(score_matrix)
+    index_best <- which.min(score_average)
+    is_best <- score_average == min(score_average)
 
-dss2_score <- function(observed, posterior_samples, ...) {
-  dss_p_score(observed, posterior_samples, p = 2)
-}
+    if (args$method == 'blocked_bootstrap') {
+      # This resamples using block bootstrap within each CPT, then combines the
+      # replicates across CPTs to generate a distribution of the difference
+      bootstrap_parts <- mclapply(unique(names), function(name_i) {
+        score_matrix_i <- score_matrix[names == name_i, ]
 
-calculate_score <- function(df_list, score_fn, name) {
-  mclapply(df_list, function(df) {
-    df <- df %>% filter(depth_has_input_data)
+        tsboot(
+          ts(score_matrix_i),
+          function(x) {
+            colSums(x - x[, index_best])
+          },
+          R = 1000,
+          l = 50,
+          sim = 'fixed'
+        )$t
+      })
+
+      bootstrap_replicates <- Reduce(`+`, bootstrap_parts) / nrow(score_matrix)
+
+      threshold <- matrixStats::colQuantiles(bootstrap_replicates, probs = 0.05)
+      is_equal_best <- threshold <= 0
+    } else if (args$method == 't_test') {
+      is_equal_best <- sapply(seq_len(ncol(score_matrix)), function(i) {
+        if (i == index_best) {
+          TRUE
+        } else {
+          t.test(
+            score_matrix[, index_best],
+            score_matrix[, i],
+            paired = FALSE,
+            alternative = 'less'
+          )$p.value > 0.05
+        }
+      })
+    }
+
     tibble(
-      metric = name,
-      model = df$model[1],
-      dataset = df$dataset[1],
-      name = df$name[1],
-      value = score_fn(
-        observed = df$log_q_c,
-        posterior_mean = df$log_q_c_star,
-        posterior_sd = df$log_q_c_star_sd,
-        posterior_q025 = df$log_q_c_star_q025,
-        posterior_q975 = df$log_q_c_star_q975,
-        posterior_samples = df$log_q_c_star_samples
-      )
+      model = models,
+      value_mean = score_average,
+      is_best = is_best,
+      is_equal_best = is_equal_best
     )
   }) %>%
-    bind_rows()
-}
-
-log_debug('Calculating scores')
-cross_validation_scores <- bind_rows(
-  calculate_score(cv_prediction_flat, mse_score, 'MSE'),
-  calculate_score(cv_prediction_flat, crps_score, 'CRPS'),
-  calculate_score(cv_prediction_flat, interval005_score, 'Int05'),
-  calculate_score(cv_prediction_flat, dss_score, 'DSS'),
-  calculate_score(cv_prediction_flat, dss2_score, 'DSS2')
-)
-
-log_debug('Aggregating scores')
-output <- bind_rows(
-  cross_validation_scores %>%
-    group_by(metric, model, dataset) %>%
-    summarise(value = mean(value), .groups = 'drop'),
-  cross_validation_scores %>%
-    filter(dataset != 'B2-T') %>%
-    group_by(metric, model) %>%
-    summarise(value = mean(value), .groups = 'drop') %>%
-    mutate(dataset = 'All')
-)
+  ungroup()
 
 log_debug('Saving scores to {args$output}')
 qs::qsave(output, args$output)

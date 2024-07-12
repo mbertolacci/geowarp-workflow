@@ -67,11 +67,32 @@ dataset_plots <- lapply(datasets, function(dataset) {
     ) +
     labs(x = 'Depth [m]', y = expression('log '*q[c]), colour = NULL) +
     scale_x_reverse() +
-    ylim(-5, 2.5) +
+    ylim(
+      if (!any(grepl('Jaksa', args$datasets))) -5 else -1.25,
+      if (!any(grepl('Jaksa', args$datasets))) 2.5 else 2.75
+    ) +
     coord_flip() +
-    ggtitle(dataset$name)
+    ggtitle(
+      if (dataset$name != 'Jaksa') dataset$name else 'Measurements'
+    )
 })
 
-output <- wrap_plots(dataset_plots, ncol = 2)
+output <- wrap_plots(
+  dataset_plots,
+  ncol = if (length(args$datasets) > 1) 2 else 1
+)
 
-ggsave_fullwidth(args$output, output, height = 20)
+if (length(args$datasets) > 1) {
+  ggsave_fullwidth(
+    args$output,
+    output,
+    height = 20
+  )
+} else {
+  ggsave_base(
+    args$output,
+    output,
+    width = 8,
+    height = 10
+  )
+}

@@ -12,7 +12,7 @@ theme_replace(
   panel.grid.minor.y = element_blank(),
   axis.text = element_text(colour = '#23373b'),
   axis.title = element_text(colour = '#23373b'),
-  plot.margin = margin(t = 5.5, r = 5.5, b = 0, l = 0, unit = 'points')
+  plot.margin = margin(t = 5.5, r = 5.5, b = 0, l = 1, unit = 'points')
 )
 
 DISPLAY_SETTINGS <- list(
@@ -52,7 +52,11 @@ NAME_PALETTE <- c(
   '#6d6cb2',
   '#8b7134',
   '#a24662',
-  '#e27e84'
+  '#e27e84',
+  # Three more for Jaksa
+  '#616ddb',
+  '#c2ad48',
+  '#d2479a'
 )
 
 three_breaks_div10 <- function(max_x, err_lower) {
@@ -66,7 +70,7 @@ three_breaks_div10 <- function(max_x, err_lower) {
   delta + (1 : 3) * tick_width
 }
 
-plot_slices <- function(df, name, label, palette, limits) {
+plot_slices <- function(df, name, label, palette, limits, breaks, labels) {
   df$value <- df[[name]]
   if (missing(limits)) {
     limits <- range(df$value, na.rm = TRUE)
@@ -75,6 +79,23 @@ plot_slices <- function(df, name, label, palette, limits) {
     pmax(df$value, limits[1] + sqrt(.Machine$double.eps)),
     limits[2] - sqrt(.Machine$double.eps)
   )
+
+  colkey <- list(
+    side = 1,
+    length = 0.7,
+    width = 2.2,
+    line.clab = 1,
+    adj.clab = 0,
+    font.clab = 1,
+    font = 1,
+    col.box = 'white'
+  )
+
+  if (!missing(breaks)) {
+    colkey$at <- breaks
+    colkey$labels <- labels
+  }
+
   perspective_mat <- with(
     df %>%
       arrange(-depth, northing, easting),
@@ -96,16 +117,7 @@ plot_slices <- function(df, name, label, palette, limits) {
       clab = label,
       axes = FALSE,
       clim = limits,
-      colkey = list(
-        side = 1,
-        length = 0.7,
-        width = 2.2,
-        line.clab = 1,
-        adj.clab = 0,
-        font.clab = 1,
-        font = 1,
-        col.box = 'white'
-      ),
+      colkey = colkey,
       alpha = 0.8
     )
   )
@@ -198,7 +210,18 @@ plot_slices <- function(df, name, label, palette, limits) {
 
 log_q_c_scale_limits <- c(-3.5, 2.75)
 log_q_c_colours <- colorRampPalette(rev(scales::brewer_pal(palette = 'RdYlBu')(11)))(50)
-log_q_c_sd_scale_limits <- c(0, 0.85)
+log_q_c_sd_scale_limits <- c(0, 0.9)
 log_q_c_sd_colours <- scales::colour_ramp(rev(scales::brewer_pal(palette = 'GnBu')(9)))(
   seq(0, 1, length.out = 100) ^ (1 / 1.8)
+)
+
+log_q_c_diff_scale_limits <- c(-0.55, 0.55)
+log_q_c_diff_colours <- colorRampPalette(rev(scales::brewer_pal(palette = 'RdBu')(11)))(50)
+
+log_q_c_sd_ratio_scale_limits <- c(0.1, 10)
+log_q_c_sd_ratio_colours <- colorRampPalette(rev(scales::brewer_pal(palette = 'RdBu')(11)))(50)
+log_q_c_sd_ratio_breaks <- c(seq(0.1, 0.9, by = 0.1), seq(1, 10, by = 1))
+log_q_c_sd_ratio_labels <- c(
+  '0.1', '', '0.3', rep('', 6), '1',
+  '', '3', rep('', 6), '10'
 )

@@ -4,60 +4,123 @@ source('scripts/partials/display.R')
 library(argparse)
 library(dplyr, warn.conflicts = FALSE)
 library(geowarp)
+library(parallel)
+
+options(mc.cores = as.integer(Sys.getenv('GEOWARP_THREADS')))
 
 parser <- ArgumentParser()
-parser$add_argument('--fits', nargs = '+')
+parser$add_argument('--mcmc-fits', nargs = '+')
+parser$add_argument('--map-fits', nargs = '+')
 parser$add_argument('--output')
 args <- parser$parse_args()
 
-fits <- lapply(args$fits, qs::qread)
+mcmc_fits <- lapply(args$mcmc_fits, qs::qread)
+map_fits <- lapply(args$map_fits, qs::qread)
 
-circle_centre <- c(0, 0, 10)
-radius <- uniroot(
-  function(x) (1.0 + sqrt(3) * x) * exp(-sqrt(3) * x) - 0.5,
-  c(0, 2)
-)$root
+n_mcmc_samples_to_use <- 1000L
 
-circle_df <- lapply(seq_along(fits), function(k) {
-  name <- name_from_fit_path(args$fits[k])
-  fit <- fits[[k]]
-  circle_centre_warped <- warped_coordinates(fit, data.frame(
-    easting = circle_centre[1],
-    northing = circle_centre[2],
-    depth = circle_centre[3]
-  ))
-
-  theta <- seq(0, 2 * pi, length.out = 200)
-  x_warped <- cbind(
-    circle_centre_warped[1] + radius * cos(theta),
-    circle_centre_warped[2] + radius * sin(theta),
-    circle_centre_warped[3]
+get_contour <- function(fit, parameters = fit$parameters) {
+  isocorrelation_contour(
+    model = fit$model,
+    parameters = parameters,
+    centre = c(0, 0, 10),
+    dimensions = c(1, 2)
   )
-  x_unwarped <- unwarped_coordinates(fit, x_warped)
-  data.frame(
-    name = name,
-    easting = x_unwarped[, 1],
-    northing = x_unwarped[, 2],
-    depth = x_unwarped[, 3],
-    stringsAsFactors = FALSE
-  )
+}
+
+map_circle_df <- lapply(seq_along(map_fits), function(k) {
+  name <- name_from_fit_path(args$map_fits[k])
+  log_debug('Processing {name} for MAP')
+
+  get_contour(map_fits[[k]]) %>%
+    mutate(name = name)
 }) %>%
   bind_rows()
 
-lighter <- function(x) colorspace::lighten(x, amount = 0.4)
-darker <- function(x) colorspace::darken(x, amount = 0.4)
+mcmc_circle_df <- lapply(seq_along(mcmc_fits), function(k) {
+  name <- name_from_fit_path(args$mcmc_fits[k])
+  log_debug('Processing {name} for MCMC')
 
-output <- ggplot(circle_df, aes(easting, northing, colour = name)) +
-  geom_path(linewidth = 0.8) +
-  coord_fixed() +
-  scale_colour_manual(values = c(
-    lighter('#1b9e77'), '#1b9e77', darker('#1b9e77'),
-    lighter('#d95f02'), '#d95f02', darker('#d95f02')
-  )) +
-  labs(
-    x = 'Easting [m]',
-    y = 'Northing [m]',
-    colour = NULL
-  )
+  fit <- mcmc_fits[[k]]
 
-ggsave_fullwidth(args$output, output, height = 12)
+  samples <- fit$samples
+  n_samples <- nrow(samples$gamma_deviation_horizontal)
+  iterations <- round(seq(1, n_samples, length.out = n_mcmc_samples_to_use))
+
+  mclapply(iterations, function(iteration) {
+    parameters <- list(
+      gamma_deviation_horizontal = samples$gamma_deviation_horizontal[iteration, ],
+      gamma_deviation_vertical = samples$gamma_deviation_vertical[iteration, ],
+      L_deviation = samples$L_deviation[iteration, , ]
+    )
+    get_contour(fit, parameters) %>%
+      mutate(iteration = iteration)
+  }) %>%
+    bind_rows() %>%
+    mutate(name = name)
+}) %>%
+  bind_rows()
+
+grid_lower <- head(seq(-60, 60, length.out = 31), -1)
+grid_centre <- grid_lower + diff(grid_lower)[1] / 2
+
+all_names <- unique(c(map_circle_df$name, mcmc_circle_df$name))
+parts <- lapply(all_names, function(name_i) {
+  map_circle_df_i <- map_circle_df %>% filter(name == name_i)
+  mcmc_circle_df_i <- mcmc_circle_df %>% filter(name == name_i)
+
+  easting_indices <- findInterval(mcmc_circle_df_i$easting, grid_lower)
+  northing_indices <- findInterval(mcmc_circle_df_i$northing, grid_lower)
+  grid_df <- expand.grid(
+    easting_index = seq_along(grid_centre),
+    northing_index = seq_along(grid_centre)
+  ) %>%
+    left_join(
+      data.frame(
+        iteration = mcmc_circle_df_i$iteration,
+        easting_index = easting_indices,
+        northing_index = northing_indices
+      ) %>%
+        group_by(iteration, easting_index, northing_index) %>%
+        summarise(n = 1, .groups = 'drop') %>%
+        group_by(easting_index, northing_index) %>%
+        summarise(n = sum(n), .groups = 'drop'),
+      by = c('easting_index', 'northing_index')
+    ) %>%
+    mutate(
+      easting = grid_centre[easting_index],
+      northing = grid_centre[northing_index],
+      n = ifelse(is.na(n), 0, n),
+      p = n / n_mcmc_samples_to_use
+    )
+
+  ggplot() +
+    geom_tile(
+      data = grid_df,
+      mapping = aes(easting, northing, fill = p),
+      width = 1.05 * diff(grid_centre)[1],
+      height = 1.05 * diff(grid_centre)[1]
+    ) +
+    geom_path(
+      data = map_circle_df_i,
+      aes(easting, northing),
+      linewidth = 0.25,
+      colour = 'red'
+    ) +
+    coord_fixed() +
+    labs(
+      x = 'Easting [m]',
+      y = 'Northing [m]',
+      fill = 'Posterior probability'
+    ) +
+    xlim(-62, 62) +
+    ylim(-62, 62) +
+    scale_fill_viridis_c(limits = c(0, 1)) +
+    theme(legend.position = 'bottom') +
+    ggtitle(name_i)
+})
+
+output <- wrap_plots(parts, guides = 'collect', ncol = 3) &
+  theme(legend.position = 'bottom')
+
+ggsave_fullwidth(args$output, output, height = 14)

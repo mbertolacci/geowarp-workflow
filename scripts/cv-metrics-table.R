@@ -4,33 +4,31 @@ source('scripts/partials/display.R')
 library(argparse)
 library(dplyr, warn.conflicts = FALSE)
 
-replace_na_false <- function(x) {
-  x[is.na(x)] <- FALSE
-  x
-}
-
 parser <- ArgumentParser()
-parser$add_argument('--cv-metrics', nargs = '+')
-parser$add_argument('--models', nargs = '+')
+parser$add_argument('--cv-fit-metrics', nargs = '+')
+parser$add_argument('--dash-after', nargs = '+')
 parser$add_argument('--output')
 args <- parser$parse_args()
 
-metrics <- qs::qread(args$cv_metrics)
+cv_fit_metrics <- qs::qread(args$cv_fit_metrics)
 
-metric_order <- c('MSE', 'CRPS', 'Int05', 'DSS', 'DSS2')
+metrics_to_show <- c('MSE', 'CRPS', 'Int05', 'DSS', 'DSS2')
+datasets_to_show <- intersect(datasets_with_all, unique(cv_fit_metrics$dataset))
+models_to_show <- intersect(models, unique(cv_fit_metrics$model))
+
 input_data <- expand.grid(
-  metric = metric_order,
-  dataset = factor(datasets_with_all, levels = datasets_with_all),
-  model = factor(unique(args$models), levels = models),
+  metric = metrics_to_show,
+  dataset = datasets_to_show,
+  model = models_to_show,
   stringsAsFactors = FALSE
 ) %>%
-  left_join(metrics, by = c('metric', 'dataset', 'model')) %>%
-  arrange(metric, dataset, model) %>%
-  group_by(metric, dataset) %>%
+  left_join(cv_fit_metrics, by = c('metric', 'dataset', 'model')) %>%
   mutate(
-    is_best = replace_na_false(value == min(value, na.rm = TRUE))
-  )
-
+    metric = factor(metric, levels = metrics_to_show),
+    dataset = factor(dataset, levels = datasets_to_show),
+    model = factor(model, levels = models_to_show)
+  ) %>%
+  arrange(metric, dataset, model)
 
 cat_nl <- function(...) {
   cat(...)
@@ -49,18 +47,22 @@ join_amp <- function(x) paste0(x, collapse = ' & ')
 
 sink(args$output)
 printf_nl(
-  r'(\begin{tabular}{rr|%s|r|%s})',
-  paste0(rep('r', length(datasets_3d)), collapse = ''),
-  paste0(rep('r', length(datasets_2d)), collapse = '')
+  r'(\begin{tabular}{rr|%s|>{\columncolor[gray]{0.95}}r|%s})',
+  paste0(rep('r', length(
+    intersect(datasets_3d, datasets_to_show)
+  )), collapse = ''),
+  paste0(rep('r', length(
+    intersect(datasets_2d, datasets_to_show)
+  )), collapse = '')
 )
 cat_nl(r'(\hline \hline)')
-printf_nl(r'(& & %s \\)', join_amp(datasets_with_all))
-for (metric_i in metric_order) {
+printf_nl(r'(& & %s \\)', join_amp(datasets_to_show))
+for (metric_i in metrics_to_show) {
   cat_nl(r'(\hline)')
   if (startsWith(metric_i, 'DSS')) {
-    models_i <- args$models[args$models != 'Binned']
+    models_i <- models_to_show[models_to_show != 'Binned']
   } else {
-    models_i <- args$models
+    models_i <- models_to_show
   }
   printf_nl(r'(\multirow{%d}{*}{%s})', length(models_i), metric_i)
   for (model_j in models_i) {
@@ -75,11 +77,22 @@ for (metric_i in metric_order) {
       model_j,
       join_amp(replace_na_empty(sprintf(
         '%s%.03f%s',
-        ifelse(df_i_j$is_best, '\\textbf{', ''),
-        df_i_j$value,
-        ifelse(df_i_j$is_best, '}', '')
+        case_when(
+          df_i_j$is_best ~ '\\textbf{',
+          df_i_j$is_equal_best ~ '\\textbf{',
+          TRUE ~ ''
+        ),
+        df_i_j$value_mean,
+        case_when(
+          df_i_j$is_best ~ '}',
+          df_i_j$is_equal_best ~ '}',
+          TRUE ~ ''
+        )
       )))
     )
+    if (model_j %in% args$dash_after) {
+      printf_nl(r'(\cdashline{2-%d})', length(datasets) + 2)
+    }
   }
 }
 cat_nl(r'(\hline \hline)')
