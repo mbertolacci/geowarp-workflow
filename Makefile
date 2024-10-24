@@ -1,4 +1,6 @@
-CPT_DATA_DIR = data/synthetic-cpt-data
+CPT_REAL_DATA_DIR = data/cpt-data
+CPT_SYNTHETIC_DATA_DIR = data/synthetic-cpt-data
+CPT_DATA_DIR = $(CPT_SYNTHETIC_DATA_DIR)
 
 $(shell mkdir -p figures intermediates logs)
 $(shell mkdir -p intermediates/fits-map \
@@ -28,7 +30,7 @@ MODELS_FULL = $(MODELS_SUBSET) GW-NoWarp GW-CV GW-NoWarp-CV GW-Vert-CV GW-WN-CV
 
 DATA_A_FIELD = $(addprefix $(CPT_DATA_DIR)/, $(addsuffix .csv, $(DATASET_NAMES_A_FIELD)))
 DATA_B_FIELD = $(addprefix $(CPT_DATA_DIR)/, $(addsuffix .csv, $(DATASET_NAMES_B_FIELD)))
-DATA_JAKSA = $(CPT_DATA_DIR)/Jaksa.csv
+DATA_JAKSA = $(CPT_REAL_DATA_DIR)/Jaksa.csv
 
 FITS_MAP = $(addprefix intermediates/fits-map/GeoWarp_, $(addsuffix .qs, $(DATASET_NAMES)))
 FITS_MAP_P25 = $(addprefix intermediates/fits-map-p25/GeoWarp_, $(addsuffix .qs, $(DATASET_NAMES)))

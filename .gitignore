@@ -1,4 +1,11 @@
-data/cpt-data/
+data/cpt-data/A1.csv
+data/cpt-data/A2.csv
+data/cpt-data/A3.csv
+data/cpt-data/B1.csv
+data/cpt-data/B2.csv
+data/cpt-data/B3.csv
+data/cpt-data/A2-T.csv
+data/cpt-data/B2-T.csv
 figures/
 figures_*/
 intermediates/
