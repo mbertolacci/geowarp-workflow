@@ -17,7 +17,7 @@ install.packages(c(
 Finally, install the `geowarp` R package:
 
 ```r
-devtools::install('external/geowarp')
+devtools::install('mbertolacci/geowarp')
 ```
 
 For the latter, you will need a working compiler toolchain.
